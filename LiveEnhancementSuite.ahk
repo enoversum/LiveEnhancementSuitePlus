@@ -2,21 +2,21 @@
  * * * Compile_AHK SETTINGS BEGIN * * *
 
 [AHK2EXE]
-Exe_File=%In_Dir%\Live Enhancement Suite.exe
+Exe_File=%In_Dir%\..\Live Enhancement Suite.exe
 Alt_Bin=D:\programme\AutoHotkey\Compiler\AutoHotkeySC.bin
 No_UPX=1
 Created_Date=1
 [VERSION]
 Set_Version_Info=1
-Company_Name=Inverted Silence & Dylan Tallchief
+Company_Name=Inverted Silence & Dylan Tallchief, with changes by enoversum
 File_Description=Live Enhancement Suite
-File_Version=0.1.4.1
+File_Version=0.1.4.2
 Inc_File_Version=0
 Internal_Name=Live Enhancement Suite
 Legal_Copyright=© 2019
 Original_Filename=Live Enhancement Suite
 Product_Name=Live Enhancement Suite
-Product_Version=0.1.4.1
+Product_Version=0.1.4.2
 [ICONS]
 Icon_1=%In_Dir%\resources\blueico.ico
 Icon_2=%In_Dir%\resources\blueico.ico
@@ -1274,9 +1274,9 @@ loop, 1{
 		Sleep, 100
 	}
 
-	; CLOSE device window if -close parameter present
+	; CLOSE device window if -close parameter present and Shift is not being pressed while clicking
 	; VST2 and VST3 only, to avoid mishaps
-	if (close_after_load = 1) {
+	if (close_after_load = 1 && !GetKeyState("Shift", "P")) {
 		WinWait, ahk_class Vst3PlugWindow, , 1
 		|| WinWait, ahk_class AbletonVstPlugClass, , 1  
 		
@@ -1603,6 +1603,7 @@ Return
 
 quickmarker:
 WinGetActiveTitle, wintitleoutput
+
 if !(InStr(wintitleoutput, "Live 9", CaseSensitive := false) = 0){
 WinMenuSelectItem,,, 3&, 13&
 }
