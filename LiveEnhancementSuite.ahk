@@ -1,22 +1,21 @@
-/*
+﻿/*
  * * * Compile_AHK SETTINGS BEGIN * * *
 
 [AHK2EXE]
 Exe_File=%In_Dir%\..\Live Enhancement Suite.exe
-Alt_Bin=D:\programme\AutoHotkey\Compiler\AutoHotkeySC.bin
 No_UPX=1
 Created_Date=1
 [VERSION]
 Set_Version_Info=1
 Company_Name=Inverted Silence & Dylan Tallchief, with changes by enoversum
 File_Description=Live Enhancement Suite
-File_Version=0.1.4.2
+File_Version=0.1.5
 Inc_File_Version=0
 Internal_Name=Live Enhancement Suite
 Legal_Copyright=© 2019
 Original_Filename=Live Enhancement Suite
 Product_Name=Live Enhancement Suite
-Product_Version=0.1.4.2
+Product_Version=0.1.5
 [ICONS]
 Icon_1=%In_Dir%\resources\blueico.ico
 Icon_2=%In_Dir%\resources\blueico.ico
@@ -474,6 +473,17 @@ Loop, Read, %A_ScriptDir%\settings.ini
 		}
 	dynamicreload := result[2]
 	}
+
+	; Read icons enabling setting if present
+	if (RegExMatch(line, "enableicons\s=\s") != 0){
+        result := StrSplit(line, "=", A_Space)
+        if !(result[2] = 0 or result[2] = 1){
+            msgbox % "Invalid parameter for " . Chr(34) "enableicons" . Chr(34) . ". Valid parameters are: 1 and 0. The program will shut down now."
+            run, %A_ScriptDir%\settings.ini
+            exitapp
+        }
+        enableicons := result[2]
+    }
 	
 	if (RegExMatch(line, "pianorollmacro\s=\s") != 0){
 	result := StrSplit(line, "=", A_Space)
@@ -524,6 +534,11 @@ Loop, Read, %A_ScriptDir%\settings.ini
 			}
 		fliptabfunction := result[2]
 	}
+}
+
+; Set icon-enabling variable to false if not present
+if (enableicons = ""){
+    enableicons := 0
 }
 
 ; alright, so this section asks the user to update the settings.ini with the one included in the package if some values are missing.
@@ -870,13 +885,16 @@ if (pianosearch = 1){
 }
 
 if (pianosearch = 0){
-if GetKeyState("LShift") = 0{
-		gosub, createpluginmenu
-		Menu, ALmenu, Show, % MX, % MY
-		}
-if GetKeyState("LShift") = 1{
-		Menu, pianomenu, show, % MX, % MY
-		}
+    if (GetKeyState("LShift") = 0){
+        ; only rebuild if dynamicreload is enabled
+        if (dynamicreload = 1){
+            gosub, createpluginmenu
+        }
+        Menu, ALmenu, Show, % MX, % MY
+    }
+    if (GetKeyState("LShift") = 1){
+        Menu, pianomenu, Show, % MX, % MY
+    }
 }
 }
 
@@ -956,31 +974,35 @@ createpluginmenu:
 
 ; this thing over here clears out all variables and folders from memory before rebuilding to prevent double entries while using dynamic reload.
 if (menuitemcount != ""){
-	menu, ALmenu, DeleteAll
+    menu, ALmenu, DeleteAll
 
-	Array := ""
-	menuitemcount := ""
-	querycount := ""
-	categoryname := ""
-	configoutput := ""
-	TestForContent := ""
-	slashcount := ""
-	counter := ""
-	outputcount := ""
-	historyi := ""
-	table := trimArray(table)
-	loop {
-		if (historyi = ""){
-			historyi := 1
-		}
-		if (table[historyi] = ""){
-			Break
-		}
-		menu, % table[historyi], DeleteAll
-		historyi := historyi + 1
-	}
-	table := ""
-	historyi := ""
+    Array := ""
+    menuitemcount := ""
+    querycount := ""
+    categoryname := ""
+    categorylabel := ""
+    categoryicon := ""
+    categorymenuid := ""
+    configoutput := ""
+    TestForContent := ""
+    slashcount := ""
+    counter := ""
+    outputcount := ""
+    historyi := ""
+    iconPathCache := ""
+    table := trimArray(table)
+    loop {
+        if (historyi = ""){
+            historyi := 1
+        }
+        if (table[historyi] = ""){
+            Break
+        }
+        menu, % table[historyi], DeleteAll
+        historyi := historyi + 1
+    }
+    table := ""
+    historyi := ""
 }
 
 loop, 1 { ; loop, 1 does nothing. I just used it so I could collapse this section of code inside of notepad++.
@@ -989,6 +1011,10 @@ mathvar := ""
 Array := Array()
 categorydest := Array()
 categoryname := Array()
+categorylabel := Array()
+categoryicon := Array()
+categorymenuid := Array()
+iconPathCache := {}
 categorydest[1] := "ALmenu"
 depth := 1
 Loop
@@ -1050,25 +1076,44 @@ Loop
 		}
 		goto, skipalles
 		}
+
 	slashcount := RegExMatch(TestForcontent, "/[^/;]+") 
 	if (slashcount > 0){ ; tests if line is category
 		depth := slashcount
-		categoryname[depth] := SubStr(configoutput, (slashcount + 1))
-		checkUTF8(categoryname[depth])
+	
+		rawCategory := SubStr(configoutput, (slashcount + 1))
+		visibleCategory := rawCategory
+		categoryIconKey := ""
+	
+		ParseMenuTitle(rawCategory, visibleCategory, categoryIconKey)
+	
+		checkUTF8(visibleCategory)
+		visibleCategory := StrReplace(visibleCategory, "&", "&&")
+	
+		categorylabel[depth] := visibleCategory
+		categoryicon[depth] := categoryIconKey
+	
+		; keep internal submenu ids separate from visible labels
+		categorymenuid[depth] := "ALmenu_cat_" . depth . "_" . mathvar
+		categoryname[depth] := categorymenuid[depth]
+	
 		if (depth > 1){
 			categorydest[depth] := categoryname[(depth - 1)]
-			}
-		;Msgbox % categoryname[depth] . " and depth = " . depth
+		} else {
+			categorydest[depth] := "ALmenu"
+		}
+	
 		if (historyi = ""){
 			historyi := 1
 		}
-		historyi := (historyi + 1) ; history keeps track of all the subcategory names so they can properly be cleared later.
+		historyi := (historyi + 1)
 		table[historyi] := categoryname[depth]
-
+	
 		CategoryHeader := 1
 		NoCategoryHeader := 0
 		goto, skipalles
 	}
+
 	TestForContent := SubStr(configoutput, 1)
 	TestForContent := RegExReplace(TestForContent, "\.\.", "ȴ")
 	If (TestForContent = "ȴ"){ ;checks if line is ..
@@ -1091,63 +1136,76 @@ Loop
 		}
 	outputcount := outputcount + 1
 	counter := outputcount/2
-	if (counter ~= "\.0+?$|^[^\.]$"){	; on titles only
-	checkUTF8(configoutput)
-	configoutput := StrReplace(configoutput, "&", "&&") 
-	}
+	if (counter ~= "\.0+?$|^[^\.]$"){    ; on titles only
+		rawTitle := configoutput
+		visibleTitle := rawTitle
+		iconKey := ""
 	
-	Array[mathvar] := configoutput ;putting the output in an array
+		ParseMenuTitle(rawTitle, visibleTitle, iconKey)
 	
-	If (counter ~= "\.0+?$|^[^\.]$"){	; on titles only
-		actionname:= RegExReplace(configoutput, "^.*?,")
-		
-		if (menuitemcount = "") ;counting how many items the config has output
-		{
-		menuitemcount := 0
+		checkUTF8(visibleTitle)
+		visibleTitle := StrReplace(visibleTitle, "&", "&&")
+	
+		Array[mathvar] := visibleTitle
+	
+		actionname := RegExReplace(visibleTitle, "^.*?,")
+	
+		if (menuitemcount = ""){
+			menuitemcount := 0
 		}
 		menuitemcount := menuitemcount + 1
+	
+		menuicon%menuitemcount% := iconKey
+	
+		if (NoCategoryHeader = 1){
+			Menu, ALmenu, Add, % Array[mathvar], % menuitemcount
+			ApplyMenuItemIcon("ALmenu", Array[mathvar], menuicon%menuitemcount%)
+			CategoryHeader := 0
+		}
+		else if (CategoryHeader = 1){
+			; Add item to the category submenu (this creates ALmenu_cat_*_*)
+			Menu, % categoryname[depth], Add, % Array[mathvar], % menuitemcount
+			ApplyMenuItemIcon(categoryname[depth], Array[mathvar], menuicon%menuitemcount%)
 		
-		If (NoCategoryHeader = 1){
-		Menu, ALmenu, Add, % Array[mathvar], % menuitemcount
-		CategoryHeader := 0
+			; Attach this submenu under its parent (ALmenu or parent category)
+			Menu, % categorydest[depth], Add, % categorylabel[depth], % ":" . categoryname[depth]
+			ApplyMenuItemIcon(categorydest[depth], categorylabel[depth], categoryicon[depth])
 		}
-		If (CategoryHeader = 1){
-		Menu, % categoryname[depth], Add, % Array[mathvar], % menuitemcount
-		Menu, % categorydest[depth], Add, % categoryname[depth], % ":" . categoryname[depth]
-		}
-		Else{
-		Menu, ALmenu, Add, % Array[mathvar], % menuitemcount
+		else{
+			Menu, ALmenu, Add, % Array[mathvar], % menuitemcount
+			ApplyMenuItemIcon("ALmenu", Array[mathvar], menuicon%menuitemcount%)
 		}
 	}
 	else{
+		Array[mathvar] := configoutput
+	
 		if (querycount = "")
 		{
 			querycount := 0
 		}
 		querycount := querycount + 1
-
+	
 		; raw search line from ini
 		searchline := Array[mathvar]
-
+	
 		; detect and strip flags
 		close_after_load%querycount% := 0
 		fold_after_load%querycount% := 0
 		searchline_trim := Trim(searchline)
-
+	
 		; -close flag
 		if InStr(searchline_trim, " -close") {
 			close_after_load%querycount% := 1
 			searchline_trim := StrReplace(searchline_trim, " -close", "")
 		}
-
-		; -fold flag (new)
+	
+		; -fold flag
 		if InStr(searchline_trim, " -fold") {
 			fold_after_load%querycount% := 1
 			searchline_trim := StrReplace(searchline_trim, " -fold", "")
 		}
-
+	
 		queryname%querycount% := searchline_trim
-
 	}
 
 	skipalles:
@@ -1180,9 +1238,14 @@ Return
 openplugin: ;you would think consistently typing something in the ableton search bar would be easy
 
 loop, 1{
+
+	; Remember if Shift was held when this load started.
+    ; This is per-call, so you can release Shift immediately after clicking the menu item.
+    ignore_close_this_load := GetKeyState("Shift", "P")
+
     ; Open browser search
     Send,{ctrl down}{f}{ctrl up}
-    ; Give Live 12.3 time to focus the search field
+    ; Give Live 12 time to focus the search field
     Sleep, 200          ; was 0 – increase if still unreliable
 
     ; Type the query
@@ -1193,22 +1256,19 @@ loop, 1{
 
 
     ; --- tempautoadd logic unchanged ---
-    if (pressingalt = 1){
-        if (GetKeyState("Lctrl", p) = 0){
-            tempautoadd := autoadd
-        }
-    }
-    if (GetKeyState("Lctrl", p) = 1){
-        if (autoadd = 1){
-            tempautoadd := 0
-        }
-        Else{
-            tempautoadd := 1
-        }
-    }
-    Else{
-        tempautoadd := autoadd
-    }
+    if (pressingalt = 1) {
+		if (GetKeyState("Lctrl", "P") = 0) {
+			tempautoadd := autoadd
+		} else {
+			if (autoadd = 1) {
+				tempautoadd := 0
+			} else {
+				tempautoadd := 1
+			}
+		}
+	} else {
+		tempautoadd := autoadd
+	}
 
     ; Auto-add behaviour
     If (tempautoadd = 1){
@@ -1274,26 +1334,26 @@ loop, 1{
 		Sleep, 100
 	}
 
-	; CLOSE device window if -close parameter present and Shift is not being pressed while clicking
-	; VST2 and VST3 only, to avoid mishaps
-	if (close_after_load = 1 && !GetKeyState("Shift", "P")) {
-		WinWait, ahk_class Vst3PlugWindow, , 1
-		|| WinWait, ahk_class AbletonVstPlugClass, , 1  
-		
-		WinGet, vst3Count, Count, ahk_class Vst3PlugWindow
-		if (vst3Count > 0) {
-			WinClose, ahk_class Vst3PlugWindow   ; VST3 window close
-		} else {
-			WinClose, ahk_class AbletonVstPlugClass	; VST2 window close
-		}
+	; CLOSE device window if -close parameter present,
+    ; unless Shift was held when the menu item was clicked.
+    ; VST2 and VST3 only, to avoid mishaps
+    if (close_after_load = 1 && !ignore_close_this_load) {
+        WinWait, ahk_class Vst3PlugWindow, , 1
+        || WinWait, ahk_class AbletonVstPlugClass, , 1
 
-		; SAFETY NET: Fallback poll if missed
-		Sleep, 500
-		if WinExist("ahk_class Vst3PlugWindow") || WinExist("ahk_class AbletonVstPlugClass") {
-			WinClose, ahk_class Vst3PlugWindow
-			|| WinClose, ahk_class AbletonVstPlugClass
-		}
-	}
+        WinGet, vst3Count, Count, ahk_class Vst3PlugWindow
+        if (vst3Count > 0) {
+            WinClose, ahk_class Vst3PlugWindow
+        } else {
+            WinClose, ahk_class AbletonVstPlugClass
+        }
+
+        Sleep, 500
+        if WinExist("ahk_class Vst3PlugWindow") || WinExist("ahk_class AbletonVstPlugClass") {
+            WinClose, ahk_class Vst3PlugWindow
+            || WinClose, ahk_class AbletonVstPlugClass
+        }
+    }
 
     skipautoadd:
     piss :=  ;
@@ -3485,6 +3545,63 @@ trimArray(arr) { ; Hash O(n)  https://stackoverflow.com/questions/46432447/how-d
 
     return newArr
 }
+
+;= Add menu-item icons functionality
+
+ParseMenuTitle(rawTitle, ByRef visibleTitle, ByRef iconKey) {
+    visibleTitle := rawTitle
+    iconKey := ""
+
+    if RegExMatch(rawTitle, "^\s*\[([^\]]+)\]\s*(.*)$", m) {
+        iconKey := Trim(m1)
+        visibleTitle := Trim(m2)
+
+		; normalize icon key to lowercase so [Synth] and [sYnTh] are identical
+        StringLower, iconKey, iconKey
+    }
+}
+
+ResolveMenuIcon(iconKey) {
+    global iconPathCache
+
+    if (iconKey = "")
+        return ""
+
+    if !IsObject(iconPathCache)
+        iconPathCache := {}
+
+    if (iconPathCache.HasKey(iconKey))
+        return iconPathCache[iconKey]
+
+    iconBase := A_ScriptDir . "\icons\" . iconKey
+    iconIco := iconBase . ".ico"
+    iconPng := iconBase . ".png"
+
+    if FileExist(iconIco)
+        iconPathCache[iconKey] := iconIco
+    else if FileExist(iconPng)
+        iconPathCache[iconKey] := iconPng
+    else
+        iconPathCache[iconKey] := ""
+
+    return iconPathCache[iconKey]
+}
+
+ApplyMenuItemIcon(menuName, itemText, iconKey) {
+    global enableicons
+
+    ; Skip all icon work unless explicitly enabled in settings.ini
+    if (enableicons != 1)
+        return
+
+    iconPath := ResolveMenuIcon(iconKey)
+    if (iconPath != "") {
+        ; 16 = small icon width; adjust if you like
+        Menu, %menuName%, Icon, %itemText%, %iconPath%, , 16
+    }
+}
+
+;= Emoji checking against UTF8-contained icons
 
 checkUTF8(string) { ; this looks super cursed, but this string tests if a menu item contains an emoji
 	global skipemojicheck
