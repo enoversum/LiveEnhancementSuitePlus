@@ -9,13 +9,13 @@ Created_Date=1
 Set_Version_Info=1
 Company_Name=Inverted Silence & Dylan Tallchief, with changes by enoversum
 File_Description=Live Enhancement Suite
-File_Version=1.5
+File_Version=1.5.2
 Inc_File_Version=0
 Internal_Name=Live Enhancement Suite
 Legal_Copyright=© 2019
 Original_Filename=Live Enhancement Suite
 Product_Name=Live Enhancement Suite
-Product_Version=1.5
+Product_Version=1.5.2
 [ICONS]
 Icon_1=%In_Dir%\resources\blueico.ico
 Icon_2=%In_Dir%\resources\blueico.ico
